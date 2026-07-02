@@ -1,0 +1,21 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "name": "Igarape Leste" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[-64.18, -8.58], [-64.02, -8.72], [-63.88, -8.9], [-63.72, -9.04]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Igarape Norte" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[-63.86, -8.49], [-63.72, -8.57], [-63.58, -8.66]]
+      }
+    }
+  ]
+}

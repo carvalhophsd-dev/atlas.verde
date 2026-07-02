@@ -1,0 +1,8 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    { "type": "Feature", "properties": { "name": "Apoio rural 1" }, "geometry": { "type": "Point", "coordinates": [-63.96, -8.7] } },
+    { "type": "Feature", "properties": { "name": "Apoio rural 2" }, "geometry": { "type": "Point", "coordinates": [-63.72, -8.88] } },
+    { "type": "Feature", "properties": { "name": "Apoio rural 3" }, "geometry": { "type": "Point", "coordinates": [-64.12, -8.96] } }
+  ]
+}

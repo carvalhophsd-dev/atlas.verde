@@ -1,0 +1,21 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "name": "Porto Claro" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-64.08, -8.64], [-63.9, -8.64], [-63.9, -8.81], [-64.08, -8.81], [-64.08, -8.64]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Vale Novo" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-63.88, -8.82], [-63.66, -8.82], [-63.66, -9.02], [-63.88, -9.02], [-63.88, -8.82]]]
+      }
+    }
+  ]
+}

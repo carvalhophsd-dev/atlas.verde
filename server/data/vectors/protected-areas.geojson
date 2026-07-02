@@ -1,0 +1,13 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "name": "Unidade Ambiental Serra Azul" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-64.18, -8.9], [-64.02, -8.83], [-63.92, -8.98], [-64.1, -9.08], [-64.18, -8.9]]]
+      }
+    }
+  ]
+}

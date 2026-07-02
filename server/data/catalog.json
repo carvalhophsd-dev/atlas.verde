@@ -1,0 +1,54 @@
+[
+  {
+    "id": "municipal-grid",
+    "title": "Malha municipal de referência",
+    "theme": "Administrativo",
+    "format": "GeoJSON",
+    "geometry": "Polígono",
+    "scale": "1:100.000",
+    "updated": "Junho/2026",
+    "features": 2,
+    "active": true,
+    "color": "border-river bg-river/15",
+    "filename": "municipal-grid.geojson"
+  },
+  {
+    "id": "hydro-lines",
+    "title": "Eixos hidrográficos principais",
+    "theme": "Hidrografia",
+    "format": "GeoJSON",
+    "geometry": "Linha",
+    "scale": "1:50.000",
+    "updated": "Maio/2026",
+    "features": 2,
+    "active": true,
+    "color": "border-sky-500 bg-sky-400/15",
+    "filename": "hydro-lines.geojson"
+  },
+  {
+    "id": "protected-areas",
+    "title": "Unidades ambientais consolidadas",
+    "theme": "Ambiental",
+    "format": "GeoJSON",
+    "geometry": "Polígono",
+    "scale": "1:250.000",
+    "updated": "Abril/2026",
+    "features": 1,
+    "active": false,
+    "color": "border-moss bg-moss/20",
+    "filename": "protected-areas.geojson"
+  },
+  {
+    "id": "rural-points",
+    "title": "Pontos de apoio rural",
+    "theme": "Cadastro",
+    "format": "GeoJSON",
+    "geometry": "Ponto",
+    "scale": "Precisão de campo",
+    "updated": "Julho/2026",
+    "features": 3,
+    "active": false,
+    "color": "border-amberline bg-amberline/20",
+    "filename": "rural-points.geojson"
+  }
+]
