@@ -81,6 +81,29 @@ app.get("/api/bases/:id/geojson", async (request, response, next) => {
   }
 });
 
+app.get("/api/bases/:id/tiles/:z/:x/:y.mvt", async (request, response, next) => {
+  try {
+    if (!database.enabled) return response.status(404).json({ message: "Tiles vetoriais exigem PostGIS." });
+
+    const base = await findBase(request.params.id);
+    if (!base) return response.status(404).json({ message: "Base nÃ£o encontrada." });
+
+    const z = Number(request.params.z);
+    const x = Number(request.params.x);
+    const y = Number(request.params.y);
+    if (![z, x, y].every(Number.isInteger) || z < 0 || z > 22 || x < 0 || y < 0) {
+      return response.status(400).json({ message: "Tile invÃ¡lido." });
+    }
+
+    const tile = await database.getVectorTile({ id: request.params.id, z, x, y });
+    response.setHeader("Content-Type", "application/vnd.mapbox-vector-tile");
+    response.setHeader("Cache-Control", "public, max-age=3600");
+    response.send(tile);
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get("/api/bases/:id/metadata", async (request, response, next) => {
   try {
     const base = await findBase(request.params.id);

@@ -2,6 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { CircleMarker, GeoJSON, MapContainer, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
+import "leaflet.vectorgrid";
 import {
   Bell,
   BookOpen,
@@ -433,7 +434,7 @@ function TopBar({ switcherOpen, setSwitcherOpen, activeMap, setActiveMap, active
   );
 }
 
-function MapCanvas({ layers, referenceBases, uploadedVectors, vectorData, activeTool, mapMode, zoom, minimapVisible }) {
+function MapCanvas({ layers, referenceBases, uploadedVectors, vectorData, activeTool, mapMode, zoom, minimapVisible, apiMode }) {
   const layerState = Object.fromEntries(layers.map((layer) => [layer.id, layer.active]));
   const activeReferenceIds = new Set(referenceBases.filter((base) => base.active).map((base) => base.id));
 
@@ -450,7 +451,7 @@ function MapCanvas({ layers, referenceBases, uploadedVectors, vectorData, active
         {layerState.soil && <GeoJSON key="soil" data={layerGeoJson.soil} style={leafletStyle("soil")} onEachFeature={bindPopup} />}
         {layerState.rural && <PointLayer points={[[-8.7, -63.96], [-8.88, -63.72], [-8.96, -64.12]]} color="#10b981" />}
         {layerState.heat && <PointLayer points={[[-8.64, -63.7], [-8.82, -63.83], [-8.96, -64.02]]} color="#fb923c" radius={14} />}
-        <ReferenceVectorLayers bases={referenceBases} vectorData={vectorData} />
+        <ReferenceVectorLayers bases={referenceBases} vectorData={vectorData} apiMode={apiMode} />
         {uploadedVectors.filter((dataset) => activeReferenceIds.has(dataset.id)).map((dataset) => (
           <GeoJSON key={dataset.id} data={dataset.geojson} style={leafletStyle("uploaded")} pointToLayer={pointToLayer("#e7b75b")} onEachFeature={bindPopup} />
         ))}
@@ -472,18 +473,55 @@ function LeafletZoomController({ zoom }) {
   return null;
 }
 
-function ReferenceVectorLayers({ bases, vectorData }) {
-  return bases
-    .filter((base) => base.active && (vectorData[base.id] || referenceGeoJson[base.id]))
-    .map((base) => (
+function ReferenceVectorLayers({ bases, vectorData, apiMode }) {
+  return bases.filter((base) => base.active).map((base) => {
+    if (apiMode === "postgis") {
+      return <VectorTileLayer key={`${base.id}-mvt-${base.active}`} base={base} />;
+    }
+
+    const data = vectorData[base.id] || referenceGeoJson[base.id];
+    if (!data) return null;
+
+    return (
       <GeoJSON
         key={`${base.id}-${base.active}`}
-        data={vectorData[base.id] || referenceGeoJson[base.id]}
+        data={data}
         style={leafletStyle(base.id)}
         pointToLayer={pointToLayer("#e7b75b")}
         onEachFeature={bindPopup}
       />
-    ));
+    );
+  });
+}
+
+function VectorTileLayer({ base }) {
+  const map = useMap();
+
+  React.useEffect(() => {
+    if (!L.vectorGrid?.protobuf) return undefined;
+
+    const layer = L.vectorGrid.protobuf(`${API_BASE}/bases/${base.id}/tiles/{z}/{x}/{y}.mvt`, {
+      rendererFactory: L.canvas.tile,
+      interactive: true,
+      maxNativeZoom: 15,
+      vectorTileLayerStyles: {
+        reference: vectorTileStyle(base.id)
+      }
+    });
+
+    layer.on("click", (event) => {
+      const props = event.layer?.properties || {};
+      const label = props.name || props.nom_tema || props.cod_imovel || base.title;
+      L.popup().setLatLng(event.latlng).setContent(String(label)).openOn(map);
+    });
+
+    layer.addTo(map);
+    return () => {
+      layer.removeFrom(map);
+    };
+  }, [base.id, map]);
+
+  return null;
 }
 
 function PointLayer({ points, color, radius = 7 }) {
@@ -507,6 +545,19 @@ function leafletStyle(id) {
     uploaded: { color: "#e7b75b", weight: 3, fillColor: "#e7b75b", fillOpacity: 0.18 }
   };
   return styles[id] || styles.uploaded;
+}
+
+function vectorTileStyle(id) {
+  const style = leafletStyle(id);
+  return {
+    color: style.color || "#e7b75b",
+    weight: style.weight || 2,
+    opacity: style.opacity ?? 0.85,
+    fill: true,
+    fillColor: style.fillColor || style.color || "#e7b75b",
+    fillOpacity: style.fillOpacity ?? 0.18,
+    dashArray: style.dashArray
+  };
 }
 
 function pointToLayer(color) {
@@ -1272,7 +1323,10 @@ function summarizeGeometry(geojson) {
 function downloadReferenceBase(base, uploadedVectors, vectorData) {
   const uploaded = uploadedVectors.find((item) => item.id === base.id);
   const geojson = uploaded?.geojson || vectorData[base.id] || referenceGeoJson[base.id];
-  if (!geojson) return;
+  if (!geojson) {
+    window.location.href = `${API_BASE}/bases/${base.id}/geojson`;
+    return;
+  }
   downloadJson(`${base.title}.geojson`, geojson);
 }
 
@@ -1329,6 +1383,7 @@ function App() {
   const [layers, setLayers] = React.useState(initialLayers);
   const [referenceBases, setReferenceBases] = React.useState(initialReferenceBases);
   const [vectorData, setVectorData] = React.useState(referenceGeoJson);
+  const [apiMode, setApiMode] = React.useState("json");
   const [uploadedDataset, setUploadedDataset] = React.useState(null);
   const [uploadedVectors, setUploadedVectors] = React.useState([]);
   const [uploadError, setUploadError] = React.useState("");
@@ -1342,10 +1397,11 @@ function App() {
   }, []);
 
   React.useEffect(() => {
+    if (apiMode === "postgis") return;
     referenceBases.forEach((base) => {
       if (!vectorData[base.id]) loadBaseGeoJson(base.id);
     });
-  }, [referenceBases, vectorData]);
+  }, [apiMode, referenceBases, vectorData]);
 
   function toggleLayer(id) {
     setLayers((items) => items.map((item) => (item.id === id ? { ...item, active: !item.active } : item)));
@@ -1478,10 +1534,16 @@ function App() {
 
   async function loadCatalogFromApi() {
     try {
+      const health = await apiRequest("/health");
+      const nextApiMode = health.database === "postgis" ? "postgis" : "json";
+      setApiMode(nextApiMode);
       const bases = await apiRequest("/bases");
       setReferenceBases(bases);
-      bases.forEach((base) => loadBaseGeoJson(base.id));
+      if (nextApiMode !== "postgis") {
+        bases.forEach((base) => loadBaseGeoJson(base.id));
+      }
     } catch (_error) {
+      setApiMode("json");
       setReferenceBases(initialReferenceBases);
       setVectorData(referenceGeoJson);
     }
@@ -1499,7 +1561,7 @@ function App() {
   return (
     <>
       <AnalysisNotes />
-      <MapCanvas layers={layers} referenceBases={referenceBases} uploadedVectors={uploadedVectors} vectorData={vectorData} activeTool={activeTool} mapMode={mapMode} zoom={zoom} minimapVisible={minimapVisible} />
+      <MapCanvas layers={layers} referenceBases={referenceBases} uploadedVectors={uploadedVectors} vectorData={vectorData} activeTool={activeTool} mapMode={mapMode} zoom={zoom} minimapVisible={minimapVisible} apiMode={apiMode} />
       <LeftRail activePanel={activePanel} setActivePanel={setActivePanel} currentUser={currentUser} />
       <TopBar
         switcherOpen={switcherOpen}

@@ -70,6 +70,18 @@ Em producao, com `DATABASE_URL`, a API grava as feicoes no PostgreSQL/PostGIS. S
 
 O filesystem da Vercel nao deve ser usado como armazenamento persistente de uploads.
 
+## Visualizacao rapida no mapa
+
+Quando a API esta conectada ao PostGIS, o frontend nao baixa a base inteira em GeoJSON para desenhar no Leaflet. Ele usa tiles vetoriais MVT gerados pelo backend:
+
+```text
+GET /api/bases/:id/tiles/:z/:x/:y.mvt
+```
+
+Esse endpoint usa `ST_AsMVT`, `ST_AsMVTGeom` e `ST_TileEnvelope` no PostGIS. Assim o mapa carrega apenas os blocos visiveis na tela, o que e mais adequado para bases grandes como SICAR/CAR.
+
+Sem PostGIS, o frontend usa GeoJSON como fallback para desenvolvimento local e demonstracao.
+
 ## Deploy
 
 ### Frontend na Vercel

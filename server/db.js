@@ -66,6 +66,31 @@ export function createDatabase({ catalogPath, vectorsDir, schemaPath }) {
       );
       return rows[0]?.geojson || null;
     },
+    async getVectorTile({ id, z, x, y }) {
+      const { rows } = await pool.query(
+        `
+        WITH tile AS (
+          SELECT ST_TileEnvelope($2, $3, $4) AS bounds
+        ),
+        mvtgeom AS (
+          SELECT
+            ST_AsMVTGeom(ST_Transform(f.geom, 3857), tile.bounds, 4096, 64, true) AS geom,
+            f.id AS feature_id,
+            f.properties
+          FROM reference_features f
+          JOIN reference_bases b ON b.id = f.base_id
+          CROSS JOIN tile
+          WHERE b.id = $1
+            AND b.active = true
+            AND f.geom && ST_Transform(tile.bounds, 4326)
+        )
+        SELECT ST_AsMVT(mvtgeom, 'reference', 4096, 'geom') AS tile
+        FROM mvtgeom
+        `,
+        [id, z, x, y]
+      );
+      return rows[0]?.tile || Buffer.alloc(0);
+    },
     async toggleBase(id) {
       const { rows } = await pool.query(
         `
