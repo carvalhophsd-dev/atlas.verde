@@ -5,14 +5,17 @@ import fs from "node:fs/promises";
 import multer from "multer";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createDatabase } from "./db.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.join(__dirname, "data");
 const vectorsDir = path.join(dataDir, "vectors");
 const uploadsDir = path.join(__dirname, "uploads");
 const catalogPath = path.join(dataDir, "catalog.json");
+const schemaPath = path.join(__dirname, "db", "schema.sql");
 const port = Number(process.env.PORT || 3333);
 const tokenSecret = process.env.ATLAS_TOKEN_SECRET || "atlas-verde-dev-secret";
+const database = createDatabase({ catalogPath, vectorsDir, schemaPath });
 
 const users = [
   { email: "admin@atlas.local", password: "admin123", name: "Administrador", role: "admin" },
@@ -29,7 +32,7 @@ app.use(cors({ origin: true }));
 app.use(express.json({ limit: "2mb" }));
 
 app.get("/api/health", (_request, response) => {
-  response.json({ ok: true, service: "atlas-verde-api" });
+  response.json({ ok: true, service: "atlas-verde-api", storage: database.enabled ? "postgis" : "json" });
 });
 
 app.post("/api/auth/login", (request, response) => {
@@ -46,7 +49,7 @@ app.post("/api/auth/login", (request, response) => {
 
 app.get("/api/bases", async (_request, response, next) => {
   try {
-    response.json(await readCatalog());
+    response.json(database.enabled ? await database.listBases() : await readCatalog());
   } catch (error) {
     next(error);
   }
@@ -56,6 +59,14 @@ app.get("/api/bases/:id/geojson", async (request, response, next) => {
   try {
     const base = await findBase(request.params.id);
     if (!base) return response.status(404).json({ message: "Base não encontrada." });
+
+    if (database.enabled) {
+      const geojson = await database.getGeoJson(request.params.id);
+      if (!geojson) return response.status(404).json({ message: "GeoJSON não encontrado." });
+      response.setHeader("Content-Type", "application/geo+json");
+      response.setHeader("Content-Disposition", `attachment; filename="${slugify(base.title)}.geojson"`);
+      return response.send(JSON.stringify(geojson, null, 2));
+    }
 
     response.download(path.join(vectorsDir, base.filename), `${slugify(base.title)}.geojson`);
   } catch (error) {
@@ -85,6 +96,12 @@ app.get("/api/bases/:id/metadata", async (request, response, next) => {
 
 app.patch("/api/bases/:id/toggle", requireAdmin, async (request, response, next) => {
   try {
+    if (database.enabled) {
+      const updated = await database.toggleBase(request.params.id);
+      if (!updated) return response.status(404).json({ message: "Base não encontrada." });
+      return response.json(updated);
+    }
+
     const catalog = await readCatalog();
     const index = catalog.findIndex((base) => base.id === request.params.id);
     if (index === -1) return response.status(404).json({ message: "Base não encontrada." });
@@ -108,6 +125,20 @@ app.post("/api/bases", requireAdmin, upload.single("file"), async (request, resp
     const id = `base-${Date.now()}`;
     const title = String(request.body.title || request.file.originalname.replace(/\.(geojson|json)$/i, "") || id).trim();
     const filename = `${id}.geojson`;
+    const baseInput = {
+      id,
+      title,
+      theme: String(request.body.theme || "Importado"),
+      scale: String(request.body.scale || "Fonte do arquivo"),
+      color: "border-amberline bg-amberline/20",
+      geojson
+    };
+
+    if (database.enabled) {
+      const base = await database.createBase(baseInput);
+      await fs.unlink(request.file.path).catch(() => {});
+      return response.status(201).json(base);
+    }
 
     await fs.writeFile(path.join(vectorsDir, filename), JSON.stringify(geojson, null, 2), "utf8");
     await fs.unlink(request.file.path).catch(() => {});
@@ -144,6 +175,7 @@ app.use((error, _request, response, _next) => {
 
 await fs.mkdir(vectorsDir, { recursive: true });
 await fs.mkdir(uploadsDir, { recursive: true });
+await database.init();
 
 app.listen(port, () => {
   console.log(`Atlas Verde API em http://127.0.0.1:${port}`);
@@ -159,6 +191,7 @@ async function writeCatalog(catalog) {
 }
 
 async function findBase(id) {
+  if (database.enabled) return database.findBase(id);
   const catalog = await readCatalog();
   return catalog.find((base) => base.id === id);
 }
