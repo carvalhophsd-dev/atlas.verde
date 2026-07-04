@@ -6,6 +6,7 @@ import multer from "multer";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createDatabase } from "./db.js";
+import { createObjectStorage } from "./storage.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.join(__dirname, "data");
@@ -16,6 +17,7 @@ const schemaPath = path.join(__dirname, "db", "schema.sql");
 const port = Number(process.env.PORT || 3333);
 const tokenSecret = process.env.ATLAS_TOKEN_SECRET || "atlas-verde-dev-secret";
 const database = createDatabase({ catalogPath, vectorsDir, schemaPath });
+const objectStorage = createObjectStorage();
 
 const users = [
   { email: "admin@atlas.local", password: "admin123", name: "Administrador", role: "admin" },
@@ -32,7 +34,12 @@ app.use(cors({ origin: true }));
 app.use(express.json({ limit: "2mb" }));
 
 app.get("/api/health", (_request, response) => {
-  response.json({ ok: true, service: "atlas-verde-api", storage: database.enabled ? "postgis" : "json" });
+  response.json({
+    ok: true,
+    service: "atlas-verde-api",
+    database: database.enabled ? "postgis" : "json",
+    objectStorage: objectStorage.provider
+  });
 });
 
 app.post("/api/auth/login", (request, response) => {
@@ -120,7 +127,8 @@ app.post("/api/bases", requireAdmin, upload.single("file"), async (request, resp
       return response.status(400).json({ message: "Envie um arquivo GeoJSON." });
     }
 
-    const raw = await fs.readFile(request.file.path, "utf8");
+    const rawBuffer = await fs.readFile(request.file.path);
+    const raw = rawBuffer.toString("utf8");
     const geojson = normalizeGeoJson(JSON.parse(raw));
     const id = `base-${Date.now()}`;
     const title = String(request.body.title || request.file.originalname.replace(/\.(geojson|json)$/i, "") || id).trim();
@@ -134,8 +142,10 @@ app.post("/api/bases", requireAdmin, upload.single("file"), async (request, resp
       geojson
     };
 
+    const storedFile = await objectStorage.uploadGeoJson({ id, filename, buffer: rawBuffer });
+
     if (database.enabled) {
-      const base = await database.createBase(baseInput);
+      const base = await database.createBase({ ...baseInput, storage: storedFile });
       await fs.unlink(request.file.path).catch(() => {});
       return response.status(201).json(base);
     }

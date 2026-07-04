@@ -80,7 +80,7 @@ export function createDatabase({ catalogPath, vectorsDir, schemaPath }) {
       );
       return rows[0] || null;
     },
-    async createBase({ id, title, theme, scale, color, geojson }) {
+    async createBase({ id, title, theme, scale, color, geojson, storage }) {
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
@@ -91,13 +91,14 @@ export function createDatabase({ catalogPath, vectorsDir, schemaPath }) {
         const { rows } = await client.query(
           `
           INSERT INTO reference_bases
-            (id, title, theme, source_format, geometry_type, source_scale, updated_label, features_count, active, color)
-          VALUES ($1, $2, $3, 'GeoJSON', $4, $5, $6, $7, true, $8)
+            (id, title, theme, source_format, geometry_type, source_scale, updated_label, features_count, active, color,
+             storage_bucket, storage_path, storage_public_url)
+          VALUES ($1, $2, $3, 'GeoJSON', $4, $5, $6, $7, true, $8, $9, $10, $11)
           RETURNING id, title, theme, source_format AS format, geometry_type AS geometry,
                     source_scale AS scale, updated_label AS updated, features_count AS features,
                     active, color
           `,
-          [id, title, theme, geometry, scale, updated, features, color]
+          [id, title, theme, geometry, scale, updated, features, color, storage?.bucket || null, storage?.path || null, storage?.publicUrl || null]
         );
 
         for (const feature of geojson.features) {

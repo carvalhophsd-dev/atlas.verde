@@ -11,6 +11,9 @@ CREATE TABLE IF NOT EXISTS reference_bases (
   features_count INTEGER NOT NULL DEFAULT 0,
   active BOOLEAN NOT NULL DEFAULT true,
   color TEXT NOT NULL DEFAULT 'border-amberline bg-amberline/20',
+  storage_bucket TEXT,
+  storage_path TEXT,
+  storage_public_url TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
